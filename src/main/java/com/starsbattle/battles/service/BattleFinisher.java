@@ -15,10 +15,15 @@ import java.time.Instant;
 /**
  * Shared "close battle + apply rewards" boundary (design: "Data Flow — turn
  * request", spec: "Win/Loss Reward Contract"). Both {@code PvpBattleService}
- * (PR11) and the future {@code PveBattleService} (PR12) call this on a
- * knockout so battle-close and reward application can never run in separate
+ * (PR11) and {@code PveBattleService} (PR12) call this on a knockout so
+ * battle-close and reward application can never run in separate
  * transactions — the equivalent of the source's Prisma {@code $transaction}
- * boundary.
+ * boundary. Three shapes cover the three winner combinations: two humans
+ * ({@link #finishWithHumanWinner}), a human beating the machine
+ * ({@link #finishWithHumanWinnerAgainstMachine} — win reward only, there is
+ * no loser {@code User} to penalize), and the machine beating a human
+ * ({@link #finishWithMachineWinner} — loss reward only, there is no winner
+ * {@code User} to reward).
  *
  * <p>{@code Propagation.MANDATORY} is deliberate (design's "two load
  * -bearing consequences"): this method must always run inside a transaction
@@ -50,6 +55,16 @@ public class BattleFinisher {
         applyLossReward(loser);
         userRepository.save(winner);
         userRepository.save(loser);
+
+        closeBattle(battle, winner);
+        publishBattleFinished(battle);
+        return battle;
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Battle finishWithHumanWinnerAgainstMachine(Battle battle, User winner) {
+        applyWinReward(winner);
+        userRepository.save(winner);
 
         closeBattle(battle, winner);
         publishBattleFinished(battle);

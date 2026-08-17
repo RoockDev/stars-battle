@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.lang.reflect.Method;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -108,15 +110,40 @@ class BattleFinisherTest {
     }
 
     @Test
+    void finishWithHumanWinnerAgainstMachineAppliesOnlyWinRewardToInitiator() {
+        Battle battle = battleInProgress(BattleMode.PVE);
+        User winner = userWith(90, 0, 3);
+
+        battleFinisher.finishWithHumanWinnerAgainstMachine(battle, winner);
+
+        assertThat(battle.getStatus()).isEqualTo(BattleStatus.FINISHED);
+        assertThat(battle.getEndedAt()).isNotNull();
+        assertThat(battle.getWinnerUser()).isEqualTo(winner);
+        assertThat(battle.getWinnerIsMachine()).isFalse();
+
+        assertThat(winner.getXp()).isEqualTo(100);
+        assertThat(winner.getLevel()).isEqualTo(2);
+        assertThat(winner.getWins()).isEqualTo(4);
+
+        verify(userRepository).save(winner);
+        verify(userRepository, times(1)).save(any(User.class));
+        verify(battleRepository).save(battle);
+    }
+
+    @Test
     void finishMethodsRequireAnAlreadyActiveTransaction() throws NoSuchMethodException {
         Method finishWithHumanWinner = BattleFinisher.class.getMethod(
                 "finishWithHumanWinner", Battle.class, User.class, User.class);
         Method finishWithMachineWinner = BattleFinisher.class.getMethod(
                 "finishWithMachineWinner", Battle.class, User.class);
+        Method finishWithHumanWinnerAgainstMachine = BattleFinisher.class.getMethod(
+                "finishWithHumanWinnerAgainstMachine", Battle.class, User.class);
 
         assertThat(finishWithHumanWinner.getAnnotation(Transactional.class).propagation())
                 .isEqualTo(Propagation.MANDATORY);
         assertThat(finishWithMachineWinner.getAnnotation(Transactional.class).propagation())
+                .isEqualTo(Propagation.MANDATORY);
+        assertThat(finishWithHumanWinnerAgainstMachine.getAnnotation(Transactional.class).propagation())
                 .isEqualTo(Propagation.MANDATORY);
     }
 
