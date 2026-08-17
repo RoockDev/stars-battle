@@ -4,8 +4,10 @@ import com.starsbattle.battles.dto.BattleView;
 import com.starsbattle.battles.dto.JoinPvpRequest;
 import com.starsbattle.battles.dto.StartPveRequest;
 import com.starsbattle.battles.dto.StartPvpRequest;
+import com.starsbattle.battles.dto.TurnResultView;
 import com.starsbattle.battles.service.BattleCreationService;
 import com.starsbattle.battles.service.BattleQueryService;
+import com.starsbattle.battles.service.PvpBattleService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -27,10 +29,13 @@ public class BattleController {
 
     private final BattleCreationService battleCreationService;
     private final BattleQueryService battleQueryService;
+    private final PvpBattleService pvpBattleService;
 
-    public BattleController(BattleCreationService battleCreationService, BattleQueryService battleQueryService) {
+    public BattleController(BattleCreationService battleCreationService, BattleQueryService battleQueryService,
+            PvpBattleService pvpBattleService) {
         this.battleCreationService = battleCreationService;
         this.battleQueryService = battleQueryService;
+        this.pvpBattleService = pvpBattleService;
     }
 
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
@@ -56,6 +61,12 @@ public class BattleController {
     @GetMapping("/{id}")
     public BattleView get(Authentication authentication, @AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         return battleQueryService.getBattleView(id, currentUserId(jwt), isAdmin(authentication));
+    }
+
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    @PostMapping("/{id}/turn")
+    public TurnResultView turn(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return pvpBattleService.applyTurn(currentUserId(jwt), id);
     }
 
     private Long currentUserId(Jwt jwt) {

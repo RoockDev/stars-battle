@@ -55,4 +55,19 @@ public final class BattleRules {
             throw new BusinessRuleException(message);
         }
     }
+
+    /**
+     * PVP turn-resolution status guard (spec: "PVP Turn Resolution" scenario
+     * "Wrong status") — FINISHED and WAITING are both invalid for taking a
+     * turn, but get distinct messages, unlike the generic
+     * {@link #assertStatus}.
+     */
+    public static void assertInProgressForTurn(BattleStatus status) {
+        if (status == BattleStatus.FINISHED) {
+            throw new BusinessRuleException("La batalla ya ha finalizado");
+        }
+        if (status == BattleStatus.WAITING) {
+            throw new BusinessRuleException("La batalla no esta en progreso");
+        }
+    }
 }

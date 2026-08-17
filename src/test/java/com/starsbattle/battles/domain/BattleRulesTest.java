@@ -95,4 +95,24 @@ class BattleRulesTest {
         assertThatCode(() -> BattleRules.assertActorIsNotInitiator(7L, 8L, "own battle"))
                 .doesNotThrowAnyException();
     }
+
+    @Test
+    void assertInProgressForTurnRejectsFinishedWithFinishedMessage() {
+        assertThatThrownBy(() -> BattleRules.assertInProgressForTurn(BattleStatus.FINISHED))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("ha finalizado");
+    }
+
+    @Test
+    void assertInProgressForTurnRejectsWaitingWithDistinctMessage() {
+        assertThatThrownBy(() -> BattleRules.assertInProgressForTurn(BattleStatus.WAITING))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("no esta en progreso");
+    }
+
+    @Test
+    void assertInProgressForTurnAllowsInProgress() {
+        assertThatCode(() -> BattleRules.assertInProgressForTurn(BattleStatus.IN_PROGRESS))
+                .doesNotThrowAnyException();
+    }
 }
