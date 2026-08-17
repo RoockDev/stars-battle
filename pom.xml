@@ -99,6 +99,26 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <plugin>
+                <!--
+                    Surefire's default includes (**/*Test.java, **/*Tests.java,
+                    **/*TestCase.java) do NOT match our integration tests, which
+                    are named **/*IT.java per the testing architecture (design
+                    doc). This project runs everything through `mvn test` (no
+                    separate failsafe/integration-test phase), so IT classes
+                    must be included explicitly or they silently never run.
+                -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                        <include>**/*TestCase.java</include>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
