@@ -1,0 +1,3 @@
+jwt:
+  secret: test-only-secret-not-for-production-use
+  expiration: 1h
