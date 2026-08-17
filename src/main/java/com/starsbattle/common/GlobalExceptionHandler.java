@@ -109,7 +109,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception ex) {
-        log.error("Unhandled exception", ex);
+        log.error("Unhandled exception reached GlobalExceptionHandler", ex);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, UNEXPECTED_ERROR_MESSAGE);
     }
 
