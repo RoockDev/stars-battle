@@ -17,6 +17,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Global error envelope (design: "Response Envelope" mapping table). Every
@@ -43,6 +44,7 @@ public class GlobalExceptionHandler {
     private static final String TYPE_MISMATCH_MESSAGE = "Parametro invalido";
     private static final String MISSING_PARAMETER_MESSAGE = "Parametro requerido faltante";
     private static final String UNEXPECTED_ERROR_MESSAGE = "Error interno del servidor";
+    private static final String NOT_FOUND_ROUTE_MESSAGE = "Recurso no encontrado";
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
@@ -105,6 +107,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<ApiResponse<Void>> handleOptimisticLockFailure(OptimisticLockingFailureException ex) {
         return error(HttpStatus.CONFLICT, OPTIMISTIC_LOCK_MESSAGE);
+    }
+
+    /**
+     * Thrown by Spring MVC's static-resource fallback when no
+     * {@code @RequestMapping} matches AND no static resource exists either
+     * — e.g. a route whose controller bean is absent under the active
+     * profile, such as {@code DevResetController}'s {@code @Profile("dev")}
+     * gating (spec: "Dev-Only Reset Endpoint" / "Non-dev profile"). Without
+     * this explicit handler, the catch-all {@link #handleUnexpected(Exception)}
+     * below would swallow it into an incorrect 500.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(NoResourceFoundException ex) {
+        return error(HttpStatus.NOT_FOUND, NOT_FOUND_ROUTE_MESSAGE);
     }
 
     @ExceptionHandler(Exception.class)

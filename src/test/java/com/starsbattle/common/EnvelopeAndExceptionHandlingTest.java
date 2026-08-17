@@ -172,4 +172,21 @@ class EnvelopeAndExceptionHandlingTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Parametro requerido faltante"));
     }
+
+    /**
+     * Guards a real regression found while implementing PR14's dev-only
+     * reset endpoint: a request to a route with NO matching
+     * {@code @RequestMapping} (e.g. because its controller bean is absent
+     * under the active profile) falls through Spring MVC's static-resource
+     * handler into {@code NoResourceFoundException}. Without an explicit
+     * handler for it, the catch-all {@code Exception.class} branch above
+     * swallowed it into an incorrect 500 instead of a 404.
+     */
+    @Test
+    void completelyUnmappedRouteMapsTo404NotTheGeneric500Handler() throws Exception {
+        mockMvc.perform(get("/test/this-route-does-not-exist"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Recurso no encontrado"));
+    }
 }
