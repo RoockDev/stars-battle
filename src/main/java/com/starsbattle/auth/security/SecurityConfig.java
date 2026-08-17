@@ -19,9 +19,12 @@ import org.springframework.security.web.SecurityFilterChain;
  * {@code @PreAuthorize} are resolved by {@code GlobalExceptionHandler}, not
  * this filter chain), and method-level RBAC via {@code @PreAuthorize}
  * ({@link EnableMethodSecurity}). Only {@code POST /auth/register},
- * {@code POST /auth/login}, {@code /actuator/health}, and the
- * {@code /ws/**} WebSocket handshake are public; everything else requires a
- * valid JWT.
+ * {@code POST /auth/login}, {@code /actuator/health}, the {@code /ws/**}
+ * WebSocket handshake, and the springdoc-openapi documentation routes
+ * ({@code /v3/api-docs/**}, {@code /swagger-ui/**}) are public; everything
+ * else requires a valid JWT. The docs routes are safe to expose: they only
+ * describe the API surface, never real data (same rationale as
+ * {@code /actuator/health}).
  *
  * <p>{@code authenticationEntryPoint} is registered in BOTH
  * {@code oauth2ResourceServer(...)} and {@code exceptionHandling(...)} —
@@ -57,7 +60,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login").permitAll()
-                        .requestMatchers("/actuator/health", "/ws/**").permitAll()
+                        .requestMatchers("/actuator/health", "/ws/**",
+                                "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                        .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))

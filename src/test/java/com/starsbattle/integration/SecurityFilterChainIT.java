@@ -70,6 +70,20 @@ class SecurityFilterChainIT extends AbstractPostgresIT {
     }
 
     @Test
+    void openApiDocsAreReachableWithoutTokenAndNotWrappedInTheEnvelope() {
+        // Discoverable API docs (springdoc-openapi) are deliberately public in
+        // this portfolio repo, same rationale as /actuator/health: they only
+        // describe the API surface, never real data. The response must also
+        // NOT be wrapped in ApiResponse -- Swagger UI expects a raw OpenAPI
+        // document, not {success, message, data}.
+        ResponseEntity<Map> response = restTemplate.getForEntity("/v3/api-docs", Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsKey("openapi");
+        assertThat(response.getBody()).doesNotContainKey("success");
+    }
+
+    @Test
     void missingTokenOnProtectedRouteReturns401WithEnvelope() {
         ResponseEntity<Map> response = restTemplate.getForEntity("/probe/secure", Map.class);
 
