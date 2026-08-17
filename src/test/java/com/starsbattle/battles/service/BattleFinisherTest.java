@@ -3,6 +3,7 @@ package com.starsbattle.battles.service;
 import com.starsbattle.battles.domain.Battle;
 import com.starsbattle.battles.domain.BattleMode;
 import com.starsbattle.battles.domain.BattleStatus;
+import com.starsbattle.battles.event.BattleUpdatedEvent;
 import com.starsbattle.battles.repository.BattleRepository;
 import com.starsbattle.characters.domain.Character;
 import com.starsbattle.users.domain.User;
@@ -10,8 +11,10 @@ import com.starsbattle.users.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,11 +43,14 @@ class BattleFinisherTest {
     @Mock
     private BattleRepository battleRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private BattleFinisher battleFinisher;
 
     @BeforeEach
     void setUp() {
-        battleFinisher = new BattleFinisher(userRepository, battleRepository);
+        battleFinisher = new BattleFinisher(userRepository, battleRepository, eventPublisher);
     }
 
     @Test
@@ -128,6 +134,22 @@ class BattleFinisherTest {
         verify(userRepository).save(winner);
         verify(userRepository, times(1)).save(any(User.class));
         verify(battleRepository).save(battle);
+    }
+
+    @Test
+    void finishPublishesBattleFinishedEventWithBattleIdAndView() {
+        Battle battle = battleInProgress(BattleMode.PVP);
+        User winner = userWith(90, 0, 3);
+        User loser = userWith(50, 2, 1);
+
+        battleFinisher.finishWithHumanWinner(battle, winner, loser);
+
+        ArgumentCaptor<BattleUpdatedEvent> captor = ArgumentCaptor.forClass(BattleUpdatedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        BattleUpdatedEvent event = captor.getValue();
+        assertThat(event.battleId()).isEqualTo(battle.getId());
+        assertThat(event.type()).isEqualTo(BattleUpdatedEvent.Type.BATTLE_FINISHED);
+        assertThat(event.payload()).isNotNull();
     }
 
     @Test

@@ -3,9 +3,12 @@ package com.starsbattle.battles.service;
 import com.starsbattle.battles.domain.Battle;
 import com.starsbattle.battles.domain.BattleStatus;
 import com.starsbattle.battles.domain.RewardCalculator;
+import com.starsbattle.battles.dto.BattleView;
+import com.starsbattle.battles.event.BattleUpdatedEvent;
 import com.starsbattle.battles.repository.BattleRepository;
 import com.starsbattle.users.domain.User;
 import com.starsbattle.users.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,21 +35,25 @@ import java.time.Instant;
  * independently of the caller's own writes (e.g. the attacker's HP change),
  * defeating the atomicity guarantee this class exists for.
  *
- * <p>No WebSocket broadcast happens here yet — {@link #publishBattleFinished}
- * is the extension point PR13 will use to publish a
- * {@code BattleChangedEvent} for a {@code @TransactionalEventListener(
- * AFTER_COMMIT)} listener to broadcast, without this transaction boundary
- * needing to change.
+ * <p>{@link #publishBattleFinished} publishes a {@link BattleUpdatedEvent}
+ * (type {@code BATTLE_FINISHED}) via {@link ApplicationEventPublisher} —
+ * consumed by {@code BattleEventBroadcaster}'s
+ * {@code @TransactionalEventListener(phase = AFTER_COMMIT)}, so a rolled
+ * -back finish never reaches a WebSocket subscriber, without this
+ * transaction boundary needing to change.
  */
 @Component
 public class BattleFinisher {
 
     private final UserRepository userRepository;
     private final BattleRepository battleRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public BattleFinisher(UserRepository userRepository, BattleRepository battleRepository) {
+    public BattleFinisher(UserRepository userRepository, BattleRepository battleRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.userRepository = userRepository;
         this.battleRepository = battleRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -111,10 +118,8 @@ public class BattleFinisher {
     }
 
     private void publishBattleFinished(Battle battle) {
-        // No-op for now (PR10 scope is only the transactional close+reward
-        // boundary). PR13 wires an ApplicationEventPublisher here to publish
-        // a BattleChangedEvent, consumed by a
-        // @TransactionalEventListener(phase = AFTER_COMMIT) broadcaster —
-        // that listener never fires for a rolled-back or lock-failed turn.
+        eventPublisher.publishEvent(
+                new BattleUpdatedEvent(battle.getId(), BattleUpdatedEvent.Type.BATTLE_FINISHED,
+                        BattleView.from(battle)));
     }
 }

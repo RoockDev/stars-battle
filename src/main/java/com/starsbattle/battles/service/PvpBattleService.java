@@ -8,11 +8,13 @@ import com.starsbattle.battles.domain.BattleRules;
 import com.starsbattle.battles.domain.BattleTurn;
 import com.starsbattle.battles.dto.BattleView;
 import com.starsbattle.battles.dto.TurnResultView;
+import com.starsbattle.battles.event.BattleUpdatedEvent;
 import com.starsbattle.battles.repository.BattleRepository;
 import com.starsbattle.characters.domain.Character;
 import com.starsbattle.common.exception.ForbiddenException;
 import com.starsbattle.common.exception.NotFoundException;
 import com.starsbattle.users.domain.User;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,13 +39,16 @@ public class PvpBattleService {
     private final AttackRoller attackRoller;
     private final BattleFinisher battleFinisher;
     private final BattleAccessChecker battleAccessChecker;
+    private final ApplicationEventPublisher eventPublisher;
 
     public PvpBattleService(BattleRepository battleRepository, AttackRoller attackRoller,
-            BattleFinisher battleFinisher, BattleAccessChecker battleAccessChecker) {
+            BattleFinisher battleFinisher, BattleAccessChecker battleAccessChecker,
+            ApplicationEventPublisher eventPublisher) {
         this.battleRepository = battleRepository;
         this.attackRoller = attackRoller;
         this.battleFinisher = battleFinisher;
         this.battleAccessChecker = battleAccessChecker;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -77,15 +82,26 @@ public class PvpBattleService {
         int defenderRemainingHp = applyDamageToDefender(battle, actorSide, damage);
 
         Battle resultBattle;
-        if (defenderRemainingHp == 0) {
-            resultBattle = finishBattle(battle, actorSide);
-        } else {
+        boolean battleContinues = defenderRemainingHp != 0;
+        if (battleContinues) {
             advanceTurn(battle, actorSide);
             resultBattle = battleRepository.save(battle);
+        } else {
+            resultBattle = finishBattle(battle, actorSide);
         }
 
-        return new TurnResultView(actorSide, roll.level(), baseAttack, roll.rolledAttack(), damage,
+        TurnResultView result = new TurnResultView(actorSide, roll.level(), baseAttack, roll.rolledAttack(), damage,
                 BattleView.from(resultBattle));
+
+        if (battleContinues) {
+            // The finish path already gets its own BATTLE_FINISHED event
+            // from BattleFinisher — only the continuing-turn path publishes
+            // here, to avoid a duplicate broadcast for the same turn.
+            eventPublisher.publishEvent(
+                    new BattleUpdatedEvent(resultBattle.getId(), BattleUpdatedEvent.Type.TURN_APPLIED, result));
+        }
+
+        return result;
     }
 
     /**

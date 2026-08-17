@@ -8,6 +8,7 @@ import com.starsbattle.battles.domain.BattleMode;
 import com.starsbattle.battles.domain.BattleStatus;
 import com.starsbattle.battles.domain.BattleTurn;
 import com.starsbattle.battles.dto.TurnResultView;
+import com.starsbattle.battles.event.BattleUpdatedEvent;
 import com.starsbattle.battles.repository.BattleRepository;
 import com.starsbattle.characters.domain.Character;
 import com.starsbattle.common.exception.BusinessRuleException;
@@ -21,12 +22,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -57,11 +60,15 @@ class PvpBattleServiceTest {
     @Mock
     private BattleFinisher battleFinisher;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private PvpBattleService pvpBattleService;
 
     @BeforeEach
     void setUp() {
-        pvpBattleService = new PvpBattleService(battleRepository, attackRoller, battleFinisher, new BattleAccessChecker());
+        pvpBattleService = new PvpBattleService(battleRepository, attackRoller, battleFinisher,
+                new BattleAccessChecker(), eventPublisher);
         when(battleRepository.save(any(Battle.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -153,6 +160,8 @@ class PvpBattleServiceTest {
         assertThat(result.damage()).isEqualTo(20);
         assertThat(result.battle().status()).isEqualTo(BattleStatus.IN_PROGRESS);
         verify(battleFinisher, never()).finishWithHumanWinner(any(), any(), any());
+        verify(eventPublisher).publishEvent(argThat((BattleUpdatedEvent event) ->
+                event.type() == BattleUpdatedEvent.Type.TURN_APPLIED));
     }
 
     @Test
@@ -173,6 +182,7 @@ class PvpBattleServiceTest {
         assertThat(result.battle().status()).isEqualTo(BattleStatus.FINISHED);
         verify(battleFinisher).finishWithHumanWinner(battle, battle.getInitiatorUser(), battle.getOpponentUser());
         verify(battleRepository, never()).save(any(Battle.class));
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test

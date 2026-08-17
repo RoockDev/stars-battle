@@ -8,11 +8,13 @@ import com.starsbattle.battles.dto.BattleView;
 import com.starsbattle.battles.dto.JoinPvpRequest;
 import com.starsbattle.battles.dto.StartPveRequest;
 import com.starsbattle.battles.dto.StartPvpRequest;
+import com.starsbattle.battles.event.BattleUpdatedEvent;
 import com.starsbattle.battles.repository.BattleRepository;
 import com.starsbattle.battles.service.BattleParticipantValidator.ValidatedParticipant;
 import com.starsbattle.characters.domain.Character;
 import com.starsbattle.characters.repository.CharacterRepository;
 import com.starsbattle.common.exception.NotFoundException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,12 +40,15 @@ public class BattleCreationService {
     private final BattleParticipantValidator participantValidator;
     private final CharacterRepository characterRepository;
     private final BattleRepository battleRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public BattleCreationService(BattleParticipantValidator participantValidator,
-            CharacterRepository characterRepository, BattleRepository battleRepository) {
+            CharacterRepository characterRepository, BattleRepository battleRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.participantValidator = participantValidator;
         this.characterRepository = characterRepository;
         this.battleRepository = battleRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -104,6 +109,9 @@ public class BattleCreationService {
         // OptimisticLockingFailureException from a concurrent join is thrown
         // there (outside this method) and mapped to 409 by
         // GlobalExceptionHandler; nothing here catches or swallows it.
-        return BattleView.from(battleRepository.save(battle));
+        Battle saved = battleRepository.save(battle);
+        BattleView view = BattleView.from(saved);
+        eventPublisher.publishEvent(new BattleUpdatedEvent(saved.getId(), BattleUpdatedEvent.Type.BATTLE_JOINED, view));
+        return view;
     }
 }

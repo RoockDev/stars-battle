@@ -8,6 +8,7 @@ import com.starsbattle.battles.dto.BattleView;
 import com.starsbattle.battles.dto.JoinPvpRequest;
 import com.starsbattle.battles.dto.StartPveRequest;
 import com.starsbattle.battles.dto.StartPvpRequest;
+import com.starsbattle.battles.event.BattleUpdatedEvent;
 import com.starsbattle.battles.repository.BattleRepository;
 import com.starsbattle.characters.domain.Character;
 import com.starsbattle.characters.repository.CharacterRepository;
@@ -22,13 +23,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -49,12 +53,16 @@ class BattleCreationServiceTest {
     @Mock
     private BattleRepository battleRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private BattleCreationService battleCreationService;
 
     @BeforeEach
     void setUp() {
         BattleParticipantValidator validator = new BattleParticipantValidator(userRepository, characterRepository);
-        battleCreationService = new BattleCreationService(validator, characterRepository, battleRepository);
+        battleCreationService =
+                new BattleCreationService(validator, characterRepository, battleRepository, eventPublisher);
         when(battleRepository.save(any(Battle.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -176,6 +184,8 @@ class BattleCreationServiceTest {
         assertThat(view.status()).isEqualTo(BattleStatus.IN_PROGRESS);
         assertThat(view.opponentUser()).isNotNull();
         assertThat(view.opponentCurrentHp()).isEqualTo(90);
+        verify(eventPublisher).publishEvent(argThat((BattleUpdatedEvent event) ->
+                event.type() == BattleUpdatedEvent.Type.BATTLE_JOINED));
     }
 
     @Test

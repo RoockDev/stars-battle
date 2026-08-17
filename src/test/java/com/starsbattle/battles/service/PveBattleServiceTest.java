@@ -7,6 +7,7 @@ import com.starsbattle.battles.domain.Battle;
 import com.starsbattle.battles.domain.BattleMode;
 import com.starsbattle.battles.domain.BattleStatus;
 import com.starsbattle.battles.dto.PveTurnResultView;
+import com.starsbattle.battles.event.BattleUpdatedEvent;
 import com.starsbattle.battles.repository.BattleRepository;
 import com.starsbattle.characters.domain.Character;
 import com.starsbattle.common.exception.BusinessRuleException;
@@ -20,12 +21,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -58,12 +61,15 @@ class PveBattleServiceTest {
     @Mock
     private BattleFinisher battleFinisher;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private PveBattleService pveBattleService;
 
     @BeforeEach
     void setUp() {
         pveBattleService = new PveBattleService(battleRepository, attackRoller, battleFinisher,
-                new BattleAccessChecker());
+                new BattleAccessChecker(), eventPublisher);
         when(battleRepository.save(any(Battle.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -140,6 +146,7 @@ class PveBattleServiceTest {
         verify(battleFinisher).finishWithHumanWinnerAgainstMachine(battle, battle.getInitiatorUser());
         verify(battleFinisher, never()).finishWithMachineWinner(any(), any());
         verify(attackRoller, never()).roll(18);
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -163,6 +170,7 @@ class PveBattleServiceTest {
         assertThat(result.battle().status()).isEqualTo(BattleStatus.FINISHED);
         verify(battleFinisher).finishWithMachineWinner(battle, battle.getInitiatorUser());
         verify(battleFinisher, never()).finishWithHumanWinnerAgainstMachine(any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -182,6 +190,8 @@ class PveBattleServiceTest {
         assertThat(result.battle().status()).isEqualTo(BattleStatus.IN_PROGRESS);
         verify(battleFinisher, never()).finishWithHumanWinnerAgainstMachine(any(), any());
         verify(battleFinisher, never()).finishWithMachineWinner(any(), any());
+        verify(eventPublisher).publishEvent(argThat((BattleUpdatedEvent event) ->
+                event.type() == BattleUpdatedEvent.Type.TURN_APPLIED));
     }
 
     private Battle pvpBattle(int initiatorHp, int opponentHp) {

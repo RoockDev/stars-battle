@@ -8,10 +8,12 @@ import com.starsbattle.battles.domain.BattleRules;
 import com.starsbattle.battles.dto.BattleView;
 import com.starsbattle.battles.dto.PveTurnResultView;
 import com.starsbattle.battles.dto.PveTurnResultView.PveAttackView;
+import com.starsbattle.battles.event.BattleUpdatedEvent;
 import com.starsbattle.battles.repository.BattleRepository;
 import com.starsbattle.characters.domain.Character;
 import com.starsbattle.common.exception.ForbiddenException;
 import com.starsbattle.common.exception.NotFoundException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,13 +37,16 @@ public class PveBattleService {
     private final AttackRoller attackRoller;
     private final BattleFinisher battleFinisher;
     private final BattleAccessChecker battleAccessChecker;
+    private final ApplicationEventPublisher eventPublisher;
 
     public PveBattleService(BattleRepository battleRepository, AttackRoller attackRoller,
-            BattleFinisher battleFinisher, BattleAccessChecker battleAccessChecker) {
+            BattleFinisher battleFinisher, BattleAccessChecker battleAccessChecker,
+            ApplicationEventPublisher eventPublisher) {
         this.battleRepository = battleRepository;
         this.attackRoller = attackRoller;
         this.battleFinisher = battleFinisher;
         this.battleAccessChecker = battleAccessChecker;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -79,7 +84,15 @@ public class PveBattleService {
 
         battle.setTurnNumber(battle.getTurnNumber() + 1);
         Battle saved = battleRepository.save(battle);
-        return new PveTurnResultView(playerAttack, machineAttack, BattleView.from(saved));
+        PveTurnResultView result = new PveTurnResultView(playerAttack, machineAttack, BattleView.from(saved));
+
+        // The two finish paths above already get their own BATTLE_FINISHED
+        // event from BattleFinisher — only the continuing-turn path
+        // publishes here.
+        eventPublisher.publishEvent(
+                new BattleUpdatedEvent(saved.getId(), BattleUpdatedEvent.Type.TURN_APPLIED, result));
+
+        return result;
     }
 
     private PveAttackView resolvePlayerAttack(Battle battle) {
