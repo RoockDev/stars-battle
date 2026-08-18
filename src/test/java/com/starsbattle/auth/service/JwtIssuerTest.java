@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 /**
  * Pure unit test (no Spring context): constructs a real Nimbus HS256
@@ -57,5 +58,23 @@ class JwtIssuerTest {
         assertThat(lifetime).isEqualTo(Duration.ofHours(1));
         assertThat(decoded.getSubject()).isEqualTo("7");
         assertThat(decoded.getClaimAsStringList("roles")).containsExactlyInAnyOrder("ADMIN", "USER");
+    }
+
+    @Test
+    void nullUserIdThrowsIllegalArgumentException() {
+        JwtIssuer issuer = new JwtIssuer(encoder, Duration.ofHours(1));
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> issuer.issue(null, "luke@batalla.com", List.of("USER")));
+    }
+
+    @Test
+    void nullRolesDefaultsToEmptyListInsteadOfThrowing() {
+        JwtIssuer issuer = new JwtIssuer(encoder, Duration.ofHours(1));
+
+        String token = issuer.issue(42L, "luke@batalla.com", null);
+        Jwt decoded = decoder.decode(token);
+
+        assertThat(decoded.getClaimAsStringList("roles")).isEmpty();
     }
 }

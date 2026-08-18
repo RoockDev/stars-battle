@@ -33,6 +33,10 @@ public class JwtIssuer {
     }
 
     public String issue(Long userId, String email, List<String> roles) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId must not be null");
+        }
+        List<String> safeRoles = roles != null ? roles : List.of();
         Instant now = Instant.now();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         JwtClaimsSet claims = JwtClaimsSet.builder()
@@ -40,7 +44,7 @@ public class JwtIssuer {
                 .expiresAt(now.plus(expiration))
                 .subject(String.valueOf(userId))
                 .claim("email", email)
-                .claim("roles", roles)
+                .claim("roles", safeRoles)
                 .build();
         return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
