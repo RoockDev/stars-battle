@@ -114,4 +114,62 @@ class EnvelopeAndExceptionHandlingTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Error interno del servidor"));
     }
+
+    @Test
+    void authenticationFailureMapsTo401WithMessage() throws Exception {
+        mockMvc.perform(get("/test/authentication"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Credenciales invalidas"));
+    }
+
+    @Test
+    void accessDeniedMapsTo403WithFallbackMessage() throws Exception {
+        mockMvc.perform(get("/test/access-denied"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("No tienes permiso para realizar esta accion"));
+    }
+
+    @Test
+    void constraintViolationMapsTo400WithFallbackMessage() throws Exception {
+        mockMvc.perform(get("/test/constraint-violation"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Datos invalidos"));
+    }
+
+    @Test
+    void unsupportedMethodMapsTo405WithMessage() throws Exception {
+        mockMvc.perform(post("/test/not-found"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Metodo no soportado"));
+    }
+
+    @Test
+    void unsupportedMediaTypeMapsTo415WithMessage() throws Exception {
+        mockMvc.perform(post("/test/validate")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("name=Luke"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Tipo de contenido no soportado"));
+    }
+
+    @Test
+    void typeMismatchMapsTo400WithMessage() throws Exception {
+        mockMvc.perform(get("/test/type-mismatch/not-a-number"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Parametro invalido"));
+    }
+
+    @Test
+    void missingParameterMapsTo400WithMessage() throws Exception {
+        mockMvc.perform(get("/test/missing-param"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Parametro requerido faltante"));
+    }
 }

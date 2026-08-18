@@ -13,8 +13,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
  * Wraps every successful controller response in {@link ApiResponse} (design:
  * "Response Envelope"). {@code supports()} opts out for
  * {@link StringHttpMessageConverter} — writing an {@code ApiResponse} through
- * it throws {@code ClassCastException} — and for actuator endpoints, whose
- * bodies are not application DTOs. Bodies that are already an
+ * it throws {@code ClassCastException} — and uses a positive allowlist: only
+ * controllers declared in the {@code com.starsbattle} base package are
+ * wrapped. This keeps framework-owned endpoints (Spring Boot's default
+ * {@code BasicErrorController}, actuator, springdoc/OpenAPI, etc.) out of the
+ * envelope without having to keep growing a blocklist as new framework
+ * controllers get added to the classpath. Bodies that are already an
  * {@link ApiResponse} pass through unchanged so this advice is idempotent.
  */
 @ControllerAdvice
@@ -22,7 +26,8 @@ public class EnvelopeResponseBodyAdvice implements ResponseBodyAdvice<Object> {
 
     static final String DEFAULT_SUCCESS_MESSAGE = "Operación realizada con éxito";
 
-    private static final String ACTUATOR_PACKAGE_PREFIX = "org.springframework.boot.actuate";
+    private static final String BASE_PACKAGE = "com.starsbattle";
+    private static final String BASE_PACKAGE_PREFIX = BASE_PACKAGE + ".";
 
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
@@ -30,13 +35,16 @@ public class EnvelopeResponseBodyAdvice implements ResponseBodyAdvice<Object> {
             return false;
         }
         String packageName = returnType.getContainingClass().getPackageName();
-        return !packageName.startsWith(ACTUATOR_PACKAGE_PREFIX);
+        return packageName.equals(BASE_PACKAGE) || packageName.startsWith(BASE_PACKAGE_PREFIX);
     }
 
     @Override
     public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType,
             Class<? extends HttpMessageConverter<?>> selectedConverterType, ServerHttpRequest request,
             ServerHttpResponse response) {
+        if (body == null) {
+            return null;
+        }
         if (body instanceof ApiResponse<?>) {
             return body;
         }

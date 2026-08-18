@@ -5,15 +5,21 @@ import com.starsbattle.common.exception.BusinessRuleException;
 import com.starsbattle.common.exception.ConflictException;
 import com.starsbattle.common.exception.ForbiddenException;
 import com.starsbattle.common.exception.NotFoundException;
+import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Test-only controller used exclusively by {@code EnvelopeAndExceptionHandlingTest}
@@ -67,6 +73,29 @@ public class TestEnvelopeController {
     @GetMapping("/test/unexpected")
     public void unexpected() {
         throw new IllegalStateException("boom");
+    }
+
+    @GetMapping("/test/authentication")
+    public void authentication() {
+        throw new BadCredentialsException("bad credentials");
+    }
+
+    @GetMapping("/test/access-denied")
+    public void accessDenied() {
+        throw new AccessDeniedException("denied");
+    }
+
+    @GetMapping("/test/constraint-violation")
+    public void constraintViolation() {
+        throw new ConstraintViolationException(Set.of());
+    }
+
+    @GetMapping("/test/type-mismatch/{id}")
+    public void typeMismatch(@PathVariable Long id) {
+    }
+
+    @GetMapping("/test/missing-param")
+    public void missingParam(@RequestParam String name) {
     }
 
     public record TestPayload(@NotBlank String name) {
