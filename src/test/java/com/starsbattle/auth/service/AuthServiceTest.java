@@ -14,11 +14,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -141,5 +144,95 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.register(new RegisterRequest("new@batalla.com", "force123")))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void registerTranslatesUniqueConstraintRaceIntoBusinessRuleException() {
+        // existsByEmail() misses because a concurrent request wins the race and
+        // commits first — the DB's uq_users_email constraint is what actually
+        // catches the duplicate, via DataIntegrityViolationException on save().
+        when(userRepository.existsByEmail("racer@batalla.com")).thenReturn(false);
+        Role userRole = new Role("USER");
+        when(roleRepository.findByName("USER")).thenReturn(Optional.of(userRole));
+        when(passwordEncoder.encode("force123")).thenReturn("hashed-force123");
+        when(userRepository.save(any(User.class)))
+                .thenThrow(new DataIntegrityViolationException("uq_users_email"));
+
+        assertThatThrownBy(() -> authService.register(new RegisterRequest("racer@batalla.com", "force123")))
+                .isInstanceOf(BusinessRuleException.class);
+
+        verifyNoInteractions(jwtIssuer);
+    }
+
+    @Test
+    void registerNormalizesEmailToTrimmedLowercaseEverywhere() {
+        when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
+        Role userRole = new Role("USER");
+        when(roleRepository.findByName("USER")).thenReturn(Optional.of(userRole));
+        when(passwordEncoder.encode("force123")).thenReturn("hashed-force123");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jwtIssuer.issue(any(), eq("user@example.com"), anyList())).thenReturn("signed-jwt-token");
+
+        AuthResponse response = authService.register(new RegisterRequest("  User@Example.com  ", "force123"));
+
+        verify(userRepository).existsByEmail("user@example.com");
+        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(savedUser.capture());
+        assertThat(savedUser.getValue().getEmail()).isEqualTo("user@example.com");
+        assertThat(response.user().email()).isEqualTo("user@example.com");
+    }
+
+    @Test
+    void loginNormalizesEmailToTrimmedLowercaseBeforeLookup() {
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(9L);
+        when(user.getEmail()).thenReturn("han@batalla.com");
+        when(user.getPasswordHash()).thenReturn("hashed-solo123");
+        when(user.getRoles()).thenReturn(Set.of(new Role("USER")));
+        when(user.getLevel()).thenReturn(1);
+        when(user.getXp()).thenReturn(0);
+        when(user.getWins()).thenReturn(0);
+        when(user.getLosses()).thenReturn(0);
+
+        when(userRepository.findByEmail("han@batalla.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("solo123", "hashed-solo123")).thenReturn(true);
+        when(jwtIssuer.issue(eq(9L), eq("han@batalla.com"), anyList())).thenReturn("another-jwt-token");
+
+        AuthResponse response = authService.login(new LoginRequest("  HAN@Batalla.com ", "solo123"));
+
+        verify(userRepository).findByEmail("han@batalla.com");
+        assertThat(response.accessToken()).isEqualTo("another-jwt-token");
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void jwtRolesClaimAndUserSummaryRolesAreSortedInTheSameOrder() {
+        Set<Role> unsortedRoles = new LinkedHashSet<>();
+        unsortedRoles.add(new Role("USER"));
+        unsortedRoles.add(new Role("ADMIN"));
+        unsortedRoles.add(new Role("MODERATOR"));
+
+        when(userRepository.existsByEmail("multi@batalla.com")).thenReturn(false);
+        when(roleRepository.findByName("USER")).thenReturn(Optional.of(new Role("USER")));
+        when(passwordEncoder.encode("force123")).thenReturn("hashed-force123");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User persisted = mock(User.class);
+            when(persisted.getId()).thenReturn(1L);
+            when(persisted.getEmail()).thenReturn("multi@batalla.com");
+            when(persisted.getRoles()).thenReturn(unsortedRoles);
+            when(persisted.getLevel()).thenReturn(1);
+            when(persisted.getXp()).thenReturn(0);
+            when(persisted.getWins()).thenReturn(0);
+            when(persisted.getLosses()).thenReturn(0);
+            return persisted;
+        });
+
+        ArgumentCaptor<List<String>> rolesCaptor = ArgumentCaptor.forClass(List.class);
+        when(jwtIssuer.issue(any(), any(), rolesCaptor.capture())).thenReturn("token");
+
+        AuthResponse response = authService.register(new RegisterRequest("multi@batalla.com", "force123"));
+
+        assertThat(rolesCaptor.getValue()).containsExactly("ADMIN", "MODERATOR", "USER");
+        assertThat(response.user().roles()).containsExactly("ADMIN", "MODERATOR", "USER");
     }
 }

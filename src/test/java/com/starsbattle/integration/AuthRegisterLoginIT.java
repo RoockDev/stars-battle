@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -108,6 +109,41 @@ class AuthRegisterLoginIT extends AbstractPostgresIT {
 
         assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(loginResponse.getBody()).containsEntry("message", "Credenciales invalidas");
+    }
+
+    @Test
+    void registerWithOverlongEmailReturnsCleanBadRequestNotServerError() {
+        // 256 chars total, over the DB's VARCHAR(255) column width, must be
+        // rejected by Bean Validation before it ever reaches the database.
+        String overlongLocalPart = "a".repeat(247);
+        String email = overlongLocalPart + "@batalla.com";
+        assertThat(email).hasSizeGreaterThan(255);
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(
+                "/auth/register", new RegisterRequest(email, "force123"), Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).containsEntry("success", false);
+    }
+
+    @Test
+    void registerThenLoginWithDifferentEmailCasingIsTreatedAsTheSameAccount() {
+        String email = "Han-" + UUID.randomUUID() + "@Batalla.COM";
+
+        ResponseEntity<Map> registerResponse = restTemplate.postForEntity(
+                "/auth/register", new RegisterRequest(email, "solo123"), Map.class);
+        assertThat(registerResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> registerData = (Map<String, Object>) registerResponse.getBody().get("data");
+        Map<String, Object> registeredUser = (Map<String, Object>) registerData.get("user");
+        assertThat(registeredUser.get("email")).isEqualTo(email.trim().toLowerCase(Locale.ROOT));
+
+        ResponseEntity<Map> duplicateAttempt = restTemplate.postForEntity(
+                "/auth/register", new RegisterRequest(email.toUpperCase(), "another-password"), Map.class);
+        assertThat(duplicateAttempt.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseEntity<Map> loginResponse = restTemplate.postForEntity(
+                "/auth/login", new LoginRequest(email.toLowerCase(), "solo123"), Map.class);
+        assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @TestConfiguration
