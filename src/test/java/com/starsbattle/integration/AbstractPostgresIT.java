@@ -16,13 +16,19 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * inherit the SAME static field, so letting JUnit's per-class lifecycle stop
  * it after the first subclass finishes breaks every subclass that runs after
  * — Ryuk reaps the container when the whole JVM exits instead.
+ *
+ * <p>This is the ONE canonical container instance for the whole test suite —
+ * {@link com.starsbattle.testsupport.AbstractDataJpaTest} reuses this exact
+ * static field instead of declaring its own, so the {@code @DataJpaTest}
+ * slice and the full-stack {@code *IT} tests never spin up two separate
+ * Postgres containers.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 public abstract class AbstractPostgresIT {
 
     @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
+    public static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
 
     static {
         POSTGRES.start();

@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.time.Instant;
+
 /**
  * A playable Star Wars character. Stats (hp/baseHp/attack/levelRequired) are
  * seeded verbatim from the source's roster (see V3__characters_roster.sql)
@@ -33,7 +35,13 @@ public class Character {
     private Integer attack;
 
     @Column(name = "level_required", nullable = false)
-    private Integer levelRequired = 1;
+    private Integer levelRequired;
+
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at", insertable = false, updatable = false)
+    private Instant updatedAt;
 
     protected Character() {
         // JPA
@@ -69,5 +77,13 @@ public class Character {
 
     public Integer getLevelRequired() {
         return levelRequired;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }

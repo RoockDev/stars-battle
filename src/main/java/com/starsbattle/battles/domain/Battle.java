@@ -91,6 +91,12 @@ public class Battle {
     @Column(nullable = false)
     private Long version;
 
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at", insertable = false, updatable = false)
+    private Instant updatedAt;
+
     protected Battle() {
         // JPA
     }
@@ -199,5 +205,13 @@ public class Battle {
 
     public Long getVersion() {
         return version;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }

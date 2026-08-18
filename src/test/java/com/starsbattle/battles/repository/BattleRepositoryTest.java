@@ -5,6 +5,7 @@ import com.starsbattle.battles.domain.BattleMode;
 import com.starsbattle.battles.domain.BattleStatus;
 import com.starsbattle.battles.domain.BattleTurn;
 import com.starsbattle.characters.domain.Character;
+import com.starsbattle.characters.repository.CharacterRepository;
 import com.starsbattle.testsupport.AbstractDataJpaTest;
 import com.starsbattle.users.domain.User;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,9 @@ class BattleRepositoryTest extends AbstractDataJpaTest {
 
     @Autowired
     private BattleRepository battleRepository;
+
+    @Autowired
+    private CharacterRepository characterRepository;
 
     @Autowired
     private TestEntityManager testEntityManager;
@@ -102,9 +106,6 @@ class BattleRepositoryTest extends AbstractDataJpaTest {
     }
 
     private List<Character> orderedRoster() {
-        return testEntityManager.getEntityManager()
-                .createQuery("select c from Character c order by c.id asc", Character.class)
-                .setMaxResults(2)
-                .getResultList();
+        return characterRepository.findAllByOrderByIdAsc();
     }
 }
