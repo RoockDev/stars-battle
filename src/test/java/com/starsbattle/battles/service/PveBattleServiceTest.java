@@ -107,7 +107,7 @@ class PveBattleServiceTest {
     void playerWinsImmediatelyWithoutMachineCounterAttack() {
         Battle battle = pveBattle(BattleStatus.IN_PROGRESS, 100, 15);
         when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
-        when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 1.5, 30));
+        when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 30));
         when(battleFinisher.finishWithHumanWinnerAgainstMachine(eq(battle), eq(battle.getInitiatorUser())))
                 .thenAnswer(invocation -> {
                     battle.setStatus(BattleStatus.FINISHED);
@@ -129,8 +129,8 @@ class PveBattleServiceTest {
     void machineWinsAfterCounterAttackWhenPlayerDoesNotFinishItFirst() {
         Battle battle = pveBattle(BattleStatus.IN_PROGRESS, 10, 100);
         when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
-        when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 1.0, 20));
-        when(attackRoller.roll(18)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 1.5, 27));
+        when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 20));
+        when(attackRoller.roll(18)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 27));
         when(battleFinisher.finishWithMachineWinner(eq(battle), eq(battle.getInitiatorUser())))
                 .thenAnswer(invocation -> {
                     battle.setStatus(BattleStatus.FINISHED);
@@ -152,8 +152,8 @@ class PveBattleServiceTest {
     void bothSurviveIncrementsTurnNumberAndReturnsBothAttacks() {
         Battle battle = pveBattle(BattleStatus.IN_PROGRESS, 100, 100);
         when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
-        when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 1.0, 20));
-        when(attackRoller.roll(18)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 1.0, 18));
+        when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 20));
+        when(attackRoller.roll(18)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 18));
 
         PveTurnResultView result = pveBattleService.applyTurn(INITIATOR_ID, BATTLE_ID);
 
