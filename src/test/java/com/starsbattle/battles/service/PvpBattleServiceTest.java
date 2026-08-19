@@ -61,13 +61,13 @@ class PvpBattleServiceTest {
 
     @BeforeEach
     void setUp() {
-        pvpBattleService = new PvpBattleService(battleRepository, attackRoller, battleFinisher);
+        pvpBattleService = new PvpBattleService(battleRepository, attackRoller, battleFinisher, new BattleAccessChecker());
         when(battleRepository.save(any(Battle.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
     void turnThrowsNotFoundWhenBattleMissing() {
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.empty());
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> pvpBattleService.applyTurn(INITIATOR_ID, BATTLE_ID))
                 .isInstanceOf(NotFoundException.class);
@@ -76,7 +76,7 @@ class PvpBattleServiceTest {
     @Test
     void turnRejectsNonPvpMode() {
         Battle battle = pveBattle();
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> pvpBattleService.applyTurn(INITIATOR_ID, BATTLE_ID))
                 .isInstanceOf(BusinessRuleException.class);
@@ -85,7 +85,7 @@ class PvpBattleServiceTest {
     @Test
     void turnRejectsFinishedBattleWithFinishedMessage() {
         Battle battle = pvpBattle(BattleStatus.FINISHED, BattleTurn.INITIATOR, 100, 100);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> pvpBattleService.applyTurn(INITIATOR_ID, BATTLE_ID))
                 .isInstanceOf(BusinessRuleException.class)
@@ -95,7 +95,7 @@ class PvpBattleServiceTest {
     @Test
     void turnRejectsWaitingBattleWithDistinctMessage() {
         Battle battle = pvpBattle(BattleStatus.WAITING, BattleTurn.INITIATOR, 100, 100);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> pvpBattleService.applyTurn(INITIATOR_ID, BATTLE_ID))
                 .isInstanceOf(BusinessRuleException.class)
@@ -105,7 +105,7 @@ class PvpBattleServiceTest {
     @Test
     void turnRejectsWhenActorIsNotTheOneWhoseTurnItIs() {
         Battle battle = pvpBattle(BattleStatus.IN_PROGRESS, BattleTurn.INITIATOR, 100, 100);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> pvpBattleService.applyTurn(OPPONENT_ID, BATTLE_ID))
                 .isInstanceOf(ForbiddenException.class);
@@ -114,16 +114,32 @@ class PvpBattleServiceTest {
     @Test
     void turnRejectsNonParticipantActor() {
         Battle battle = pvpBattle(BattleStatus.IN_PROGRESS, BattleTurn.INITIATOR, 100, 100);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> pvpBattleService.applyTurn(999L, BATTLE_ID))
                 .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
+    void turnRejectsNonParticipantWithForbiddenBeforeAnyBusinessStateCheck() {
+        // Regression test for the authorization-ordering bug: a non-participant
+        // probing this endpoint must get 403 regardless of the battle's actual
+        // mode/status, never a business-state 400 that would leak battle state
+        // to a stranger. Uses a FINISHED battle specifically because
+        // assertInProgressForTurn would otherwise throw its own 400 first if
+        // the state check ran before the participant check.
+        Battle battle = pvpBattle(BattleStatus.FINISHED, BattleTurn.INITIATOR, 100, 100);
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
+
+        assertThatThrownBy(() -> pvpBattleService.applyTurn(999L, BATTLE_ID))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageNotContaining("ha finalizado");
+    }
+
+    @Test
     void turnAppliesDamageIncrementsTurnAndFlipsNextTurnWhenBothSurvive() {
         Battle battle = pvpBattle(BattleStatus.IN_PROGRESS, BattleTurn.INITIATOR, 100, 100);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
         when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 20));
 
         TurnResultView result = pvpBattleService.applyTurn(INITIATOR_ID, BATTLE_ID);
@@ -142,7 +158,7 @@ class PvpBattleServiceTest {
     @Test
     void turnFloorsDamageAtZeroHpAndFinishesWhenDefenderKnockedOut() {
         Battle battle = pvpBattle(BattleStatus.IN_PROGRESS, BattleTurn.INITIATOR, 100, 15);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
         when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 30));
         when(battleFinisher.finishWithHumanWinner(eq(battle), eq(battle.getInitiatorUser()), eq(battle.getOpponentUser())))
                 .thenAnswer(invocation -> {
@@ -162,7 +178,7 @@ class PvpBattleServiceTest {
     @Test
     void turnFinishesWithOpponentAsWinnerWhenInitiatorKnockedOut() {
         Battle battle = pvpBattle(BattleStatus.IN_PROGRESS, BattleTurn.OPPONENT, 10, 100);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
         when(attackRoller.roll(18)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 27));
         when(battleFinisher.finishWithHumanWinner(eq(battle), eq(battle.getOpponentUser()), eq(battle.getInitiatorUser())))
                 .thenAnswer(invocation -> {

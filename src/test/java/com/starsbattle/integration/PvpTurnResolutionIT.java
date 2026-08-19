@@ -46,6 +46,24 @@ class PvpTurnResolutionIT extends AbstractPostgresIT {
     }
 
     @Test
+    void turnRejectsNonParticipantWithForbiddenRegardlessOfBattleState() {
+        // Regression test for the authorization-ordering bug: a stranger
+        // probing someone else's battle must get 403, not a business-state
+        // 400 that would reveal the battle's mode/status to a non-participant.
+        // The battle here is WAITING (not even started as PVP yet) — before
+        // the fix this would have leaked a "no esta en progreso" 400 instead.
+        Participant initiator = registerParticipant();
+        Participant stranger = registerParticipant();
+        ResponseEntity<Map> startResponse =
+                post("/battles/start/pvp", initiator.token(), Map.of("myCharacterId", LUKE_ID));
+        Long battleId = Long.valueOf(String.valueOf(data(startResponse).get("id")));
+
+        ResponseEntity<Map> response = post("/battles/" + battleId + "/turn", stranger.token());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     void turnRejectsNonPvpBattle() {
         Participant player = registerParticipant();
         ResponseEntity<Map> startResponse = post("/battles/start/pve", player.token(),

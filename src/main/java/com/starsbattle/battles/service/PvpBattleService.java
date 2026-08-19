@@ -36,18 +36,29 @@ public class PvpBattleService {
     private final BattleRepository battleRepository;
     private final AttackRoller attackRoller;
     private final BattleFinisher battleFinisher;
+    private final BattleAccessChecker battleAccessChecker;
 
     public PvpBattleService(BattleRepository battleRepository, AttackRoller attackRoller,
-            BattleFinisher battleFinisher) {
+            BattleFinisher battleFinisher, BattleAccessChecker battleAccessChecker) {
         this.battleRepository = battleRepository;
         this.attackRoller = attackRoller;
         this.battleFinisher = battleFinisher;
+        this.battleAccessChecker = battleAccessChecker;
     }
 
     @Transactional
     public TurnResultView applyTurn(Long actorUserId, Long battleId) {
-        Battle battle = battleRepository.findById(battleId)
+        Battle battle = battleRepository.findWithAssociationsById(battleId)
                 .orElseThrow(() -> new NotFoundException(BATTLE_NOT_FOUND_MESSAGE));
+
+        // Participant check comes first, before any business-state rule, so a
+        // non-participant probing this endpoint always gets 403 regardless of
+        // the battle's actual mode/status — mirroring BattleQueryService's
+        // assertCanView-right-after-fetch pattern instead of leaking battle
+        // state via a revealing 400.
+        if (!battleAccessChecker.isParticipant(battle, actorUserId)) {
+            throw new ForbiddenException(NOT_YOUR_TURN_MESSAGE);
+        }
 
         BattleRules.assertMode(battle.getMode(), BattleMode.PVP, NOT_PVP_MODE_MESSAGE);
         BattleRules.assertInProgressForTurn(battle.getStatus());
@@ -77,14 +88,16 @@ public class PvpBattleService {
                 BattleView.from(resultBattle));
     }
 
+    /**
+     * Picks the caller's side. Only called after {@link BattleAccessChecker
+     * #isParticipant} has already confirmed {@code actorUserId} is either the
+     * initiator or the opponent, so no further membership check is needed
+     * here — that logic lives in {@link BattleAccessChecker} alone.
+     */
     private BattleTurn resolveActorSide(Battle battle, Long actorUserId) {
-        if (Objects.equals(actorUserId, battle.getInitiatorUser().getId())) {
-            return BattleTurn.INITIATOR;
-        }
-        if (battle.getOpponentUser() != null && Objects.equals(actorUserId, battle.getOpponentUser().getId())) {
-            return BattleTurn.OPPONENT;
-        }
-        throw new ForbiddenException(NOT_YOUR_TURN_MESSAGE);
+        return Objects.equals(actorUserId, battle.getInitiatorUser().getId())
+                ? BattleTurn.INITIATOR
+                : BattleTurn.OPPONENT;
     }
 
     private int applyDamageToDefender(Battle battle, BattleTurn actorSide, int damage) {
