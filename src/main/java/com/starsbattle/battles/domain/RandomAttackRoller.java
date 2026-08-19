@@ -26,7 +26,8 @@ public final class RandomAttackRoller implements AttackRoller {
                 : r < 0.95 ? AttackLevel.ALTO
                 : AttackLevel.CRITICO;
 
-        int rolled = (int) Math.max(1L, Math.round(baseAttack * level.multiplier()));
-        return new AttackRoll(level, level.multiplier(), rolled);
+        long roundedAttack = Math.round(baseAttack * level.multiplier());
+        int rolled = (int) Math.max(1L, Math.min(roundedAttack, Integer.MAX_VALUE));
+        return new AttackRoll(level, rolled);
     }
 }

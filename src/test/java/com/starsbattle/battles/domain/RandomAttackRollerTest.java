@@ -69,6 +69,24 @@ class RandomAttackRollerTest {
         }
     }
 
+    @Test
+    void rolledAttackStaysPositiveEvenWhenTheMultipliedResultOverflowsInt() {
+        // baseAttack * CRITICO's x1.5 multiplier = 3_221_225_470.5, which
+        // rounds to a long (3_221_225_471) above Integer.MAX_VALUE. The old
+        // `(int) Math.max(1L, Math.round(...))` narrowed that long straight
+        // to int, wrapping it to -1_073_741_825 — a negative "attack" that
+        // breaks the "attacks never miss" invariant. (Integer.MAX_VALUE / 2
+        // does NOT reproduce this: 1_073_741_823 * 1.5 = 1_610_612_734.5
+        // stays comfortably inside int range, so it wouldn't have caught the
+        // bug — this test needs baseAttack close to Integer.MAX_VALUE itself.)
+        AttackRoller roller = new RandomAttackRoller(fixed(0.99)); // CRITICO, x1.5
+
+        AttackRoll result = roller.roll(Integer.MAX_VALUE);
+
+        assertThat(result.rolledAttack()).isGreaterThanOrEqualTo(1);
+        assertThat(result.rolledAttack()).isEqualTo(Integer.MAX_VALUE);
+    }
+
     private RandomSource fixed(double value) {
         return () -> value;
     }
