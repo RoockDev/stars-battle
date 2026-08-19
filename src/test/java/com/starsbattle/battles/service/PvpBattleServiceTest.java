@@ -124,7 +124,7 @@ class PvpBattleServiceTest {
     void turnAppliesDamageIncrementsTurnAndFlipsNextTurnWhenBothSurvive() {
         Battle battle = pvpBattle(BattleStatus.IN_PROGRESS, BattleTurn.INITIATOR, 100, 100);
         when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
-        when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 1.0, 20));
+        when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 20));
 
         TurnResultView result = pvpBattleService.applyTurn(INITIATOR_ID, BATTLE_ID);
 
@@ -143,7 +143,7 @@ class PvpBattleServiceTest {
     void turnFloorsDamageAtZeroHpAndFinishesWhenDefenderKnockedOut() {
         Battle battle = pvpBattle(BattleStatus.IN_PROGRESS, BattleTurn.INITIATOR, 100, 15);
         when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
-        when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 1.5, 30));
+        when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 30));
         when(battleFinisher.finishWithHumanWinner(eq(battle), eq(battle.getInitiatorUser()), eq(battle.getOpponentUser())))
                 .thenAnswer(invocation -> {
                     battle.setStatus(BattleStatus.FINISHED);
@@ -163,7 +163,7 @@ class PvpBattleServiceTest {
     void turnFinishesWithOpponentAsWinnerWhenInitiatorKnockedOut() {
         Battle battle = pvpBattle(BattleStatus.IN_PROGRESS, BattleTurn.OPPONENT, 10, 100);
         when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
-        when(attackRoller.roll(18)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 1.5, 27));
+        when(attackRoller.roll(18)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 27));
         when(battleFinisher.finishWithHumanWinner(eq(battle), eq(battle.getOpponentUser()), eq(battle.getInitiatorUser())))
                 .thenAnswer(invocation -> {
                     battle.setStatus(BattleStatus.FINISHED);
