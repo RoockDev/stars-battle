@@ -51,7 +51,7 @@ public class BattleFinisher {
         userRepository.save(winner);
         userRepository.save(loser);
 
-        closeBattle(battle, winner, false);
+        closeBattle(battle, winner);
         publishBattleFinished(battle);
         return battle;
     }
@@ -61,7 +61,7 @@ public class BattleFinisher {
         applyLossReward(humanLoser);
         userRepository.save(humanLoser);
 
-        closeBattle(battle, null, true);
+        closeBattle(battle, null);
         publishBattleFinished(battle);
         return battle;
     }
@@ -78,11 +78,16 @@ public class BattleFinisher {
         loser.setLosses(reward.losses());
     }
 
-    private void closeBattle(Battle battle, User winner, boolean winnerIsMachine) {
+    private void closeBattle(Battle battle, User winner) {
         battle.setStatus(BattleStatus.FINISHED);
         battle.setEndedAt(Instant.now());
         battle.setWinnerUser(winner);
-        battle.setWinnerIsMachine(winnerIsMachine);
+        // winnerIsMachine is derived from winner nullity rather than taken as
+        // a separate caller-supplied flag — a User winner and a machine
+        // winner are mutually exclusive by construction, so an independent
+        // boolean parameter would allow an inconsistent (winner, isMachine)
+        // pair that nothing here prevents.
+        battle.setWinnerIsMachine(winner == null);
         // Explicit save (symmetric with the winner/loser saves above) rather
         // than relying purely on dirty-checking: it also correctly merges
         // the change back if the caller handed us a battle instance loaded

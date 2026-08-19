@@ -47,7 +47,7 @@ class BattleFinisherTest {
 
     @Test
     void finishWithHumanWinnerAppliesWinAndLossRewardsAndClosesBattle() {
-        Battle battle = pvpBattleInProgress();
+        Battle battle = battleInProgress(BattleMode.PVP);
         User winner = userWith(90, 0, 3);
         User loser = userWith(50, 2, 1);
 
@@ -72,7 +72,7 @@ class BattleFinisherTest {
 
     @Test
     void finishWithMachineWinnerAppliesOnlyLossRewardToInitiator() {
-        Battle battle = pveBattleInProgress();
+        Battle battle = battleInProgress(BattleMode.PVE);
         User humanLoser = userWith(20, 4, 1);
 
         battleFinisher.finishWithMachineWinner(battle, humanLoser);
@@ -90,6 +90,24 @@ class BattleFinisherTest {
     }
 
     @Test
+    void closeBattleDerivesWinnerIsMachineFromWinnerNullityRatherThanACallerFlag() {
+        Battle humanWinnerBattle = battleInProgress(BattleMode.PVP);
+        User winner = userWith(0, 0, 0);
+        User loser = userWith(0, 0, 0);
+        battleFinisher.finishWithHumanWinner(humanWinnerBattle, winner, loser);
+        assertThat(humanWinnerBattle.getWinnerIsMachine())
+                .as("a non-null winner must derive winnerIsMachine=false")
+                .isFalse();
+
+        Battle machineWinnerBattle = battleInProgress(BattleMode.PVE);
+        User humanLoser = userWith(0, 0, 0);
+        battleFinisher.finishWithMachineWinner(machineWinnerBattle, humanLoser);
+        assertThat(machineWinnerBattle.getWinnerIsMachine())
+                .as("a null winner must derive winnerIsMachine=true")
+                .isTrue();
+    }
+
+    @Test
     void finishMethodsRequireAnAlreadyActiveTransaction() throws NoSuchMethodException {
         Method finishWithHumanWinner = BattleFinisher.class.getMethod(
                 "finishWithHumanWinner", Battle.class, User.class, User.class);
@@ -102,18 +120,10 @@ class BattleFinisherTest {
                 .isEqualTo(Propagation.MANDATORY);
     }
 
-    private Battle pvpBattleInProgress() {
+    private Battle battleInProgress(BattleMode mode) {
         User initiator = new User("initiator@batalla.com", "hash");
         Character character = new Character("Luke Skywalker", 100, 100, 20, 1);
-        Battle battle = new Battle(BattleMode.PVP, initiator, character);
-        battle.setStatus(BattleStatus.IN_PROGRESS);
-        return battle;
-    }
-
-    private Battle pveBattleInProgress() {
-        User initiator = new User("initiator@batalla.com", "hash");
-        Character character = new Character("Luke Skywalker", 100, 100, 20, 1);
-        Battle battle = new Battle(BattleMode.PVE, initiator, character);
+        Battle battle = new Battle(mode, initiator, character);
         battle.setStatus(BattleStatus.IN_PROGRESS);
         return battle;
     }
