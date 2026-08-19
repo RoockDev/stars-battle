@@ -31,13 +31,13 @@ public class UserRankingService {
     @Transactional(readOnly = true)
     public List<RankingRow> getRanking(Integer limit) {
         int effectiveLimit = clamp(limit);
-        List<User> ranked = userRepository.findAllByOrderByWinsDescLossesAscXpDesc(
+        List<User> ranked = userRepository.findAllByOrderByWinsDescLossesAscXpDescIdAsc(
                 PageRequest.of(0, effectiveLimit));
 
         List<RankingRow> rows = new ArrayList<>(ranked.size());
         int rank = 1;
         for (User user : ranked) {
-            rows.add(new RankingRow(rank, user.getId(), user.getEmail(), user.getWins(), user.getLosses(),
+            rows.add(new RankingRow(rank, user.getId(), user.getWins(), user.getLosses(),
                     user.getXp(), user.getLevel()));
             rank++;
         }

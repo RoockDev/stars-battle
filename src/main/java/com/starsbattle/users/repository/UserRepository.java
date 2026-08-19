@@ -13,5 +13,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmail(String email);
 
-    List<User> findAllByOrderByWinsDescLossesAscXpDesc(Pageable pageable);
+    /**
+     * Ordered wins DESC, losses ASC, xp DESC, with {@code id ASC} as a final
+     * deterministic tiebreaker — freshly-registered users all default to
+     * wins=0/losses=0/xp=0, so ties are genuinely reachable, and Postgres
+     * gives no ordering guarantee between tied rows without an explicit
+     * tiebreaker. {@code id ASC} keeps the sequential {@code rank} field
+     * stable across repeated calls (first-registered ranks first among
+     * ties).
+     */
+    List<User> findAllByOrderByWinsDescLossesAscXpDescIdAsc(Pageable pageable);
 }

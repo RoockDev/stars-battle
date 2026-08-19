@@ -1,6 +1,8 @@
 package com.starsbattle.integration;
 
 import com.starsbattle.auth.service.JwtIssuer;
+import com.starsbattle.users.domain.User;
+import com.starsbattle.users.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -31,6 +33,9 @@ class CharactersAndRankingIT extends AbstractPostgresIT {
 
     @Autowired
     private JwtIssuer jwtIssuer;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Test
     void listCharactersWithoutTokenReturns401() {
@@ -85,5 +90,21 @@ class CharactersAndRankingIT extends AbstractPostgresIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsEntry("success", true);
+    }
+
+    @Test
+    void rankingResponseOmitsEmailForEveryRankedPlayer() {
+        userRepository.save(new User("ranked-player@batalla.com", "hashed-password"));
+        String token = jwtIssuer.issue(4L, "viewer@batalla.com", List.of("USER"));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+                "/users/ranking", HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> ranking = (List<Map<String, Object>>) response.getBody().get("data");
+        assertThat(ranking).isNotEmpty();
+        assertThat(ranking).allSatisfy(row -> assertThat(row).doesNotContainKey("email"));
     }
 }

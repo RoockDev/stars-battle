@@ -32,7 +32,7 @@ class UserRepositoryTest extends AbstractDataJpaTest {
         User moreLossesSameWins = newUser("more-losses@batalla.com", 5, 2, 50);
         userRepository.saveAll(List.of(moreLossesSameWins, mostWins, fewerLossesSameWins));
 
-        List<User> ranking = userRepository.findAllByOrderByWinsDescLossesAscXpDesc(PageRequest.of(0, 10));
+        List<User> ranking = userRepository.findAllByOrderByWinsDescLossesAscXpDescIdAsc(PageRequest.of(0, 10));
 
         assertThat(ranking).extracting(User::getEmail)
                 .containsExactly("most-wins@batalla.com", "fewer-losses@batalla.com", "more-losses@batalla.com");
@@ -44,10 +44,27 @@ class UserRepositoryTest extends AbstractDataJpaTest {
         User higherXp = newUser("higher-xp@batalla.com", 3, 1, 80);
         userRepository.saveAll(List.of(lowerXp, higherXp));
 
-        List<User> ranking = userRepository.findAllByOrderByWinsDescLossesAscXpDesc(PageRequest.of(0, 10));
+        List<User> ranking = userRepository.findAllByOrderByWinsDescLossesAscXpDescIdAsc(PageRequest.of(0, 10));
 
         assertThat(ranking).extracting(User::getEmail)
                 .containsExactly("higher-xp@batalla.com", "lower-xp@batalla.com");
+    }
+
+    @Test
+    void rankingBreaksFullTiesByIdAscForDeterministicOrder() {
+        User tiedFirstRegistered = newUser("tied-first@batalla.com", 0, 0, 0);
+        User tiedSecondRegistered = newUser("tied-second@batalla.com", 0, 0, 0);
+        User tiedThirdRegistered = newUser("tied-third@batalla.com", 0, 0, 0);
+        userRepository.saveAll(List.of(tiedFirstRegistered, tiedSecondRegistered, tiedThirdRegistered));
+
+        List<Long> expectedOrder = List.of(
+                tiedFirstRegistered.getId(), tiedSecondRegistered.getId(), tiedThirdRegistered.getId());
+
+        for (int i = 0; i < 5; i++) {
+            List<User> ranking = userRepository.findAllByOrderByWinsDescLossesAscXpDescIdAsc(PageRequest.of(0, 10));
+
+            assertThat(ranking).extracting(User::getId).containsExactlyElementsOf(expectedOrder);
+        }
     }
 
     @Test

@@ -40,7 +40,7 @@ class UserRankingServiceTest {
 
     @Test
     void nullLimitDefaultsToTen() {
-        when(userRepository.findAllByOrderByWinsDescLossesAscXpDesc(org.mockito.ArgumentMatchers.any()))
+        when(userRepository.findAllByOrderByWinsDescLossesAscXpDescIdAsc(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of());
 
         userRankingService.getRanking(null);
@@ -50,7 +50,7 @@ class UserRankingServiceTest {
 
     @Test
     void limitOfZeroClampsToOne() {
-        when(userRepository.findAllByOrderByWinsDescLossesAscXpDesc(org.mockito.ArgumentMatchers.any()))
+        when(userRepository.findAllByOrderByWinsDescLossesAscXpDescIdAsc(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of());
 
         userRankingService.getRanking(0);
@@ -60,7 +60,7 @@ class UserRankingServiceTest {
 
     @Test
     void negativeLimitClampsToOne() {
-        when(userRepository.findAllByOrderByWinsDescLossesAscXpDesc(org.mockito.ArgumentMatchers.any()))
+        when(userRepository.findAllByOrderByWinsDescLossesAscXpDescIdAsc(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of());
 
         userRankingService.getRanking(-5);
@@ -70,7 +70,7 @@ class UserRankingServiceTest {
 
     @Test
     void limitAboveOneHundredClampsToOneHundred() {
-        when(userRepository.findAllByOrderByWinsDescLossesAscXpDesc(org.mockito.ArgumentMatchers.any()))
+        when(userRepository.findAllByOrderByWinsDescLossesAscXpDescIdAsc(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of());
 
         userRankingService.getRanking(500);
@@ -80,7 +80,7 @@ class UserRankingServiceTest {
 
     @Test
     void limitWithinRangeIsUsedAsIs() {
-        when(userRepository.findAllByOrderByWinsDescLossesAscXpDesc(org.mockito.ArgumentMatchers.any()))
+        when(userRepository.findAllByOrderByWinsDescLossesAscXpDescIdAsc(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of());
 
         userRankingService.getRanking(25);
@@ -92,7 +92,7 @@ class UserRankingServiceTest {
     void mapsRepositoryOrderToOneBasedRankRows() {
         User first = userWith(1L, "most-wins@batalla.com", 10, 1, 90, 3);
         User second = userWith(2L, "second@batalla.com", 5, 2, 40, 2);
-        when(userRepository.findAllByOrderByWinsDescLossesAscXpDesc(org.mockito.ArgumentMatchers.any()))
+        when(userRepository.findAllByOrderByWinsDescLossesAscXpDescIdAsc(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of(first, second));
 
         List<RankingRow> ranking = userRankingService.getRanking(10);
@@ -101,7 +101,6 @@ class UserRankingServiceTest {
         RankingRow row1 = ranking.get(0);
         assertThat(row1.rank()).isEqualTo(1);
         assertThat(row1.id()).isEqualTo(1L);
-        assertThat(row1.email()).isEqualTo("most-wins@batalla.com");
         assertThat(row1.wins()).isEqualTo(10);
         assertThat(row1.losses()).isEqualTo(1);
         assertThat(row1.xp()).isEqualTo(90);
@@ -112,16 +111,23 @@ class UserRankingServiceTest {
         assertThat(row2.id()).isEqualTo(2L);
     }
 
+    @Test
+    void rankingRowHasNoEmailField() {
+        assertThat(RankingRow.class.getRecordComponents())
+                .extracting(java.lang.reflect.RecordComponent::getName)
+                .containsExactly("rank", "id", "wins", "losses", "xp", "level")
+                .doesNotContain("email");
+    }
+
     private void assertEffectiveLimit(int expectedLimit) {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(userRepository).findAllByOrderByWinsDescLossesAscXpDesc(pageableCaptor.capture());
+        verify(userRepository).findAllByOrderByWinsDescLossesAscXpDescIdAsc(pageableCaptor.capture());
         assertThat(pageableCaptor.getValue()).isEqualTo(PageRequest.of(0, expectedLimit));
     }
 
     private User userWith(Long id, String email, int wins, int losses, int xp, int level) {
         User user = mock(User.class);
         when(user.getId()).thenReturn(id);
-        when(user.getEmail()).thenReturn(email);
         when(user.getWins()).thenReturn(wins);
         when(user.getLosses()).thenReturn(losses);
         when(user.getXp()).thenReturn(xp);
