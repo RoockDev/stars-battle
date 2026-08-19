@@ -41,7 +41,7 @@ class BattleQueryServiceTest {
     @Test
     void returnsBattleViewWhenBattleExistsAndCallerIsInitiator() {
         Battle battle = battleWithInitiator(1L);
-        when(battleRepository.findById(42L)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(42L)).thenReturn(Optional.of(battle));
 
         BattleView view = battleQueryService.getBattleView(42L, 1L, false);
 
@@ -49,9 +49,21 @@ class BattleQueryServiceTest {
     }
 
     @Test
+    void returnedBattleViewNeverIncludesParticipantEmail() {
+        Battle battle = battleWithInitiator(1L);
+        when(battleRepository.findWithAssociationsById(42L)).thenReturn(Optional.of(battle));
+
+        BattleView view = battleQueryService.getBattleView(42L, 1L, false);
+
+        assertThat(view.initiatorUser().getClass().getRecordComponents())
+                .extracting(java.lang.reflect.RecordComponent::getName)
+                .doesNotContain("email");
+    }
+
+    @Test
     void adminCanViewAnyBattle() {
         Battle battle = battleWithInitiator(1L);
-        when(battleRepository.findById(42L)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(42L)).thenReturn(Optional.of(battle));
 
         BattleView view = battleQueryService.getBattleView(42L, 999L, true);
 
@@ -64,7 +76,7 @@ class BattleQueryServiceTest {
         when(initiator.getId()).thenReturn(1L);
         Character character = new Character("Luke Skywalker", 100, 100, 20, 1);
         Battle battle = new Battle(BattleMode.PVP, initiator, character);
-        when(battleRepository.findById(42L)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(42L)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> battleQueryService.getBattleView(42L, 2L, false))
                 .isInstanceOf(ForbiddenException.class);
@@ -72,7 +84,7 @@ class BattleQueryServiceTest {
 
     @Test
     void missingBattleThrowsNotFound() {
-        when(battleRepository.findById(42L)).thenReturn(Optional.empty());
+        when(battleRepository.findWithAssociationsById(42L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> battleQueryService.getBattleView(42L, 1L, false))
                 .isInstanceOf(NotFoundException.class);
@@ -81,7 +93,6 @@ class BattleQueryServiceTest {
     private Battle battleWithInitiator(Long initiatorId) {
         User initiator = mock(User.class);
         when(initiator.getId()).thenReturn(initiatorId);
-        when(initiator.getEmail()).thenReturn("initiator@batalla.com");
         when(initiator.getLevel()).thenReturn(1);
         when(initiator.getXp()).thenReturn(0);
         when(initiator.getWins()).thenReturn(0);

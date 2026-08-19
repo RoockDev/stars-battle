@@ -23,7 +23,7 @@ public class BattleQueryService {
 
     @Transactional(readOnly = true)
     public BattleView getBattleView(Long battleId, Long callerUserId, boolean callerIsAdmin) {
-        Battle battle = battleRepository.findById(battleId)
+        Battle battle = battleRepository.findWithAssociationsById(battleId)
                 .orElseThrow(() -> new NotFoundException(BATTLE_NOT_FOUND_MESSAGE));
         battleAccessChecker.assertCanView(battle, callerUserId, callerIsAdmin);
         return BattleView.from(battle);

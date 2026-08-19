@@ -11,7 +11,9 @@ not accidental drift:
   (`process.env.SECRET_KEY || 'secretKey'`) if the env var is unset. This
   port has no fallback: the application refuses to start without
   `JWT_SECRET` configured, in both the signing and verification paths.
-- **Ranking/leaderboard responses omit email.** The reference NestJS app
-  exposed every ranked player's email to any authenticated user; this port
-  drops it as a privacy hardening, since a leaderboard has no legitimate
-  need to expose peer contact info.
+- **Ranking/leaderboard and battle view responses omit email.** The
+  reference NestJS app exposed every ranked player's email to any
+  authenticated user, and battle responses (`GET /battles/:id`) exposed both
+  participants' emails to each other; this port drops it in both places as a
+  privacy hardening, since neither a leaderboard nor a battle opponent/admin
+  has a legitimate need to see peer contact info.

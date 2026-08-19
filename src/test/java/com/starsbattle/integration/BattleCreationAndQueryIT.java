@@ -90,6 +90,16 @@ class BattleCreationAndQueryIT extends AbstractPostgresIT {
     }
 
     @Test
+    void startPveReturns404WhenBothCharacterIdsAreIdenticalAndMissing() {
+        Participant player = registerParticipant();
+
+        ResponseEntity<Map> response = post("/battles/start/pve", player.token(),
+                Map.of("myCharacterId", 999999, "machineCharacterId", 999999));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
     void startPvpCreatesWaitingBattleWithNoOpponent() {
         Participant player = registerParticipant();
 
@@ -163,6 +173,20 @@ class BattleCreationAndQueryIT extends AbstractPostgresIT {
         ResponseEntity<Map> response = get("/battles/" + battleId, initiator.token());
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void getBattleViewOmitsParticipantEmail() {
+        Participant initiator = registerParticipant();
+        Participant opponent = registerParticipant();
+        Long battleId = startPvpBattle(initiator, LUKE_ID);
+        post("/battles/" + battleId + "/join/pvp", opponent.token(), Map.of("myCharacterId", HAN_ID));
+
+        ResponseEntity<Map> response = get("/battles/" + battleId, initiator.token());
+
+        Map<String, Object> data = data(response);
+        assertThat((Map) data.get("initiatorUser")).doesNotContainKey("email");
+        assertThat((Map) data.get("opponentUser")).doesNotContainKey("email");
     }
 
     @Test

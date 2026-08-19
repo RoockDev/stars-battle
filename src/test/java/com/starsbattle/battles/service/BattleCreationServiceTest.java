@@ -81,8 +81,26 @@ class BattleCreationServiceTest {
 
     @Test
     void startPveRejectsEqualCharacterIds() {
+        User user = userWithLevel(1L, 5);
+        Character myCharacter = characterWith(10L, 100, 1);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(characterRepository.findById(10L)).thenReturn(Optional.of(myCharacter));
+
         assertThatThrownBy(() -> battleCreationService.startPve(1L, new StartPveRequest(10L, 10L)))
                 .isInstanceOf(BusinessRuleException.class);
+    }
+
+    @Test
+    void startPveThrowsNotFoundWhenBothCharacterIdsAreIdenticalAndNonexistent() {
+        User user = userWithLevel(1L, 5);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        // characterRepository.findById(99999L) intentionally left unstubbed
+        // (Optional.empty()) — proves existence is validated BEFORE the
+        // distinct-characters business rule, so two identical nonexistent
+        // ids surface as 404, not 400.
+
+        assertThatThrownBy(() -> battleCreationService.startPve(1L, new StartPveRequest(99999L, 99999L)))
+                .isInstanceOf(NotFoundException.class);
     }
 
     @Test
@@ -146,7 +164,7 @@ class BattleCreationServiceTest {
         Character initiatorCharacter = characterWith(10L, 100, 1);
         Battle battle = new Battle(BattleMode.PVP, initiator, initiatorCharacter);
         battle.setStatus(BattleStatus.WAITING);
-        when(battleRepository.findById(99L)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(99L)).thenReturn(Optional.of(battle));
 
         User opponent = userWithLevel(2L, 5);
         Character opponentCharacter = characterWith(11L, 90, 1);
@@ -162,7 +180,7 @@ class BattleCreationServiceTest {
 
     @Test
     void joinPvpThrowsNotFoundWhenBattleMissing() {
-        when(battleRepository.findById(99L)).thenReturn(Optional.empty());
+        when(battleRepository.findWithAssociationsById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> battleCreationService.joinPvp(2L, 99L, new JoinPvpRequest(11L)))
                 .isInstanceOf(NotFoundException.class);
@@ -173,7 +191,7 @@ class BattleCreationServiceTest {
         User initiator = userWithLevel(1L, 5);
         Character initiatorCharacter = characterWith(10L, 100, 1);
         Battle battle = new Battle(BattleMode.PVE, initiator, initiatorCharacter);
-        when(battleRepository.findById(99L)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(99L)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> battleCreationService.joinPvp(2L, 99L, new JoinPvpRequest(11L)))
                 .isInstanceOf(BusinessRuleException.class);
@@ -185,7 +203,7 @@ class BattleCreationServiceTest {
         Character initiatorCharacter = characterWith(10L, 100, 1);
         Battle battle = new Battle(BattleMode.PVP, initiator, initiatorCharacter);
         battle.setStatus(BattleStatus.IN_PROGRESS);
-        when(battleRepository.findById(99L)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(99L)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> battleCreationService.joinPvp(2L, 99L, new JoinPvpRequest(11L)))
                 .isInstanceOf(BusinessRuleException.class);
@@ -197,7 +215,7 @@ class BattleCreationServiceTest {
         Character initiatorCharacter = characterWith(10L, 100, 1);
         Battle battle = new Battle(BattleMode.PVP, initiator, initiatorCharacter);
         battle.setStatus(BattleStatus.WAITING);
-        when(battleRepository.findById(99L)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(99L)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> battleCreationService.joinPvp(1L, 99L, new JoinPvpRequest(11L)))
                 .isInstanceOf(BusinessRuleException.class);
@@ -210,7 +228,7 @@ class BattleCreationServiceTest {
         Battle battle = new Battle(BattleMode.PVP, initiator, initiatorCharacter);
         battle.setStatus(BattleStatus.WAITING);
         battle.setOpponentUser(userWithLevel(3L, 5));
-        when(battleRepository.findById(99L)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(99L)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> battleCreationService.joinPvp(2L, 99L, new JoinPvpRequest(11L)))
                 .isInstanceOf(BusinessRuleException.class);
@@ -222,7 +240,7 @@ class BattleCreationServiceTest {
         Character initiatorCharacter = characterWith(10L, 100, 1);
         Battle battle = new Battle(BattleMode.PVP, initiator, initiatorCharacter);
         battle.setStatus(BattleStatus.WAITING);
-        when(battleRepository.findById(99L)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(99L)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> battleCreationService.joinPvp(2L, 99L, new JoinPvpRequest(10L)))
                 .isInstanceOf(BusinessRuleException.class);
@@ -234,7 +252,7 @@ class BattleCreationServiceTest {
         Character initiatorCharacter = characterWith(10L, 100, 1);
         Battle battle = new Battle(BattleMode.PVP, initiator, initiatorCharacter);
         battle.setStatus(BattleStatus.WAITING);
-        when(battleRepository.findById(99L)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(99L)).thenReturn(Optional.of(battle));
 
         User opponent = userWithLevel(2L, 1);
         Character opponentCharacter = characterWith(11L, 90, 5);

@@ -48,12 +48,16 @@ public class BattleCreationService {
 
     @Transactional
     public BattleView startPve(Long userId, StartPveRequest request) {
-        BattleRules.assertDistinctCharacters(request.myCharacterId(), request.machineCharacterId(),
-                SAME_CHARACTER_MESSAGE);
-
         ValidatedParticipant participant = participantValidator.validateParticipant(userId, request.myCharacterId());
         Character machineCharacter = characterRepository.findById(request.machineCharacterId())
                 .orElseThrow(() -> new NotFoundException(MACHINE_CHARACTER_NOT_FOUND_MESSAGE));
+
+        // Existence (both characters) is validated above, BEFORE this
+        // business-rule check — otherwise two identical nonexistent
+        // character ids would surface as 400 "must differ" instead of the
+        // more accurate 404 "not found".
+        BattleRules.assertDistinctCharacters(request.myCharacterId(), request.machineCharacterId(),
+                SAME_CHARACTER_MESSAGE);
 
         Battle battle = new Battle(BattleMode.PVE, participant.user(), participant.character());
         battle.setOpponentCharacter(machineCharacter);
@@ -78,7 +82,7 @@ public class BattleCreationService {
 
     @Transactional
     public BattleView joinPvp(Long actorUserId, Long battleId, JoinPvpRequest request) {
-        Battle battle = battleRepository.findById(battleId)
+        Battle battle = battleRepository.findWithAssociationsById(battleId)
                 .orElseThrow(() -> new NotFoundException(BATTLE_NOT_FOUND_MESSAGE));
 
         BattleRules.assertMode(battle.getMode(), BattleMode.PVP, NOT_PVP_MODE_MESSAGE);
