@@ -15,8 +15,6 @@ import com.starsbattle.common.exception.NotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Objects;
-
 /**
  * PVE turn resolution (spec: "PVE Turn Resolution"). Unlike
  * {@link PvpBattleService}, resolves UP TO TWO attacks in a single call: the
@@ -36,25 +34,34 @@ public class PveBattleService {
     private final BattleRepository battleRepository;
     private final AttackRoller attackRoller;
     private final BattleFinisher battleFinisher;
+    private final BattleAccessChecker battleAccessChecker;
 
     public PveBattleService(BattleRepository battleRepository, AttackRoller attackRoller,
-            BattleFinisher battleFinisher) {
+            BattleFinisher battleFinisher, BattleAccessChecker battleAccessChecker) {
         this.battleRepository = battleRepository;
         this.attackRoller = attackRoller;
         this.battleFinisher = battleFinisher;
+        this.battleAccessChecker = battleAccessChecker;
     }
 
     @Transactional
     public PveTurnResultView applyTurn(Long actorUserId, Long battleId) {
-        Battle battle = battleRepository.findById(battleId)
+        Battle battle = battleRepository.findWithAssociationsById(battleId)
                 .orElseThrow(() -> new NotFoundException(BATTLE_NOT_FOUND_MESSAGE));
+
+        // Participant check comes first, before any business-state rule, so a
+        // non-participant probing this endpoint always gets 403 regardless of
+        // the battle's actual mode/status — mirroring BattleQueryService's
+        // assertCanView-right-after-fetch pattern instead of leaking battle
+        // state via a revealing 400. BattleAccessChecker#isParticipant
+        // degrades correctly here since opponentUser is always null for PVE
+        // battles, so this is equivalent to an initiator-only check.
+        if (!battleAccessChecker.isParticipant(battle, actorUserId)) {
+            throw new ForbiddenException(NOT_YOUR_BATTLE_MESSAGE);
+        }
 
         BattleRules.assertMode(battle.getMode(), BattleMode.PVE, NOT_PVE_MODE_MESSAGE);
         BattleRules.assertInProgressForTurn(battle.getStatus());
-
-        if (!Objects.equals(actorUserId, battle.getInitiatorUser().getId())) {
-            throw new ForbiddenException(NOT_YOUR_BATTLE_MESSAGE);
-        }
 
         PveAttackView playerAttack = resolvePlayerAttack(battle);
 

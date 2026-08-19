@@ -62,13 +62,14 @@ class PveBattleServiceTest {
 
     @BeforeEach
     void setUp() {
-        pveBattleService = new PveBattleService(battleRepository, attackRoller, battleFinisher);
+        pveBattleService = new PveBattleService(battleRepository, attackRoller, battleFinisher,
+                new BattleAccessChecker());
         when(battleRepository.save(any(Battle.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
     void turnThrowsNotFoundWhenBattleMissing() {
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.empty());
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> pveBattleService.applyTurn(INITIATOR_ID, BATTLE_ID))
                 .isInstanceOf(NotFoundException.class);
@@ -77,7 +78,7 @@ class PveBattleServiceTest {
     @Test
     void turnRejectsNonPveMode() {
         Battle battle = pvpBattle(100, 100);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> pveBattleService.applyTurn(INITIATOR_ID, BATTLE_ID))
                 .isInstanceOf(BusinessRuleException.class);
@@ -86,7 +87,7 @@ class PveBattleServiceTest {
     @Test
     void turnRejectsFinishedBattleWithFinishedMessage() {
         Battle battle = pveBattle(BattleStatus.FINISHED, 100, 100);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> pveBattleService.applyTurn(INITIATOR_ID, BATTLE_ID))
                 .isInstanceOf(BusinessRuleException.class)
@@ -96,7 +97,7 @@ class PveBattleServiceTest {
     @Test
     void turnRejectsNonInitiatorActor() {
         Battle battle = pveBattle(BattleStatus.IN_PROGRESS, 100, 100);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
 
         assertThatThrownBy(() -> pveBattleService.applyTurn(OTHER_USER_ID, BATTLE_ID))
                 .isInstanceOf(ForbiddenException.class)
@@ -104,9 +105,25 @@ class PveBattleServiceTest {
     }
 
     @Test
+    void turnRejectsNonParticipantWithForbiddenBeforeAnyBusinessStateCheck() {
+        // Regression test for the authorization-ordering bug: a non-participant
+        // probing this endpoint must get 403 regardless of the battle's actual
+        // mode/status, never a business-state 400 that would leak battle state
+        // to a stranger. Uses a FINISHED battle specifically because
+        // assertInProgressForTurn would otherwise throw its own 400 first if
+        // the state check ran before the participant check.
+        Battle battle = pveBattle(BattleStatus.FINISHED, 100, 100);
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
+
+        assertThatThrownBy(() -> pveBattleService.applyTurn(OTHER_USER_ID, BATTLE_ID))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageNotContaining("ha finalizado");
+    }
+
+    @Test
     void playerWinsImmediatelyWithoutMachineCounterAttack() {
         Battle battle = pveBattle(BattleStatus.IN_PROGRESS, 100, 15);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
         when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 30));
         when(battleFinisher.finishWithHumanWinnerAgainstMachine(eq(battle), eq(battle.getInitiatorUser())))
                 .thenAnswer(invocation -> {
@@ -128,7 +145,7 @@ class PveBattleServiceTest {
     @Test
     void machineWinsAfterCounterAttackWhenPlayerDoesNotFinishItFirst() {
         Battle battle = pveBattle(BattleStatus.IN_PROGRESS, 10, 100);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
         when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 20));
         when(attackRoller.roll(18)).thenReturn(new AttackRoll(AttackLevel.CRITICO, 27));
         when(battleFinisher.finishWithMachineWinner(eq(battle), eq(battle.getInitiatorUser())))
@@ -151,7 +168,7 @@ class PveBattleServiceTest {
     @Test
     void bothSurviveIncrementsTurnNumberAndReturnsBothAttacks() {
         Battle battle = pveBattle(BattleStatus.IN_PROGRESS, 100, 100);
-        when(battleRepository.findById(BATTLE_ID)).thenReturn(Optional.of(battle));
+        when(battleRepository.findWithAssociationsById(BATTLE_ID)).thenReturn(Optional.of(battle));
         when(attackRoller.roll(20)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 20));
         when(attackRoller.roll(18)).thenReturn(new AttackRoll(AttackLevel.NORMAL, 18));
 
