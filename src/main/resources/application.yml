@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: stars-battle
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/starsbattle}
+    username: ${SPRING_DATASOURCE_USERNAME:starsbattle}
+    password: ${SPRING_DATASOURCE_PASSWORD:starsbattle}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    locations: classpath:db/migration
+    clean-disabled: true
+
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+
+server:
+  port: ${PORT:3000}
+
+# JWT signing/verification secret. No default on purpose: the app MUST fail to
+# start if this is not provided, mirroring the source's requirement that
+# SECRET_KEY be set explicitly (the source's insecure fallback is NOT ported).
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 1h
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed
+    clean-disabled: false
